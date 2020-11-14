@@ -100,3 +100,14 @@ int hal_sndfile_reset_buff_ptr(audio_file_t* audio_file) {
 
     return 0;
 }
+
+int hal_sndfile_check_wav_s16_format(audio_file_t* audio_file) {
+
+    if (audio_file->info.format != (SF_FORMAT_WAV | SF_FORMAT_PCM_16)) {
+
+        LOG_ERROR("Audio file not WAV S16_LE format\n");
+        return -1;
+    }
+
+    return 0;
+}

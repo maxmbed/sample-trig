@@ -247,6 +247,11 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
+        if (hal_sndfile_check_wav_s16_format(&sample[i]->file)) {
+            LOG_ERROR("Sample format not supported for %s", argv[i+1]);
+            return -1;
+        }
+
         char sample_mq_name[CH_NAME_MAX] = {0};
         sprintf(sample_mq_name, "%s_%d", SAMPLE_MESSAGE_NAME, i);
         if (hal_mqueue_init(&sample[i]->mq, sample_mq_name, NULL) < 0) {

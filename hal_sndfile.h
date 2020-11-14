@@ -24,5 +24,6 @@ int hal_sndfile_open(audio_file_t* audio_file, char* file_path);
 int hal_sndfile_close(audio_file_t* audio_file);
 long int hal_sndfile_read(audio_file_t* audio_file, sf_count_t num_frames);
 int hal_sndfile_reset_buff_ptr(audio_file_t* audio_file);
+int hal_sndfile_check_wav_s16_format(audio_file_t* audio_file);
 
 #endif /* HAL_SNDFILE */
