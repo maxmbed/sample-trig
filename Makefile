@@ -11,7 +11,7 @@ CFLAGS  += -O0 -Dposix -ggdb -O2 -msoft-float -Wall -Wlogical-op -Wtype-limits -
 LDFLAGS += -lsndfile -lasound -lpthread -lrt -ldl -lm
 LDFLAGS += -L $(SDKTARGETSYSROOT)/usr/lib -L $(SDKTARGETSYSROOT)/lib
 
-$(BINARY_NAME): $(BINARY_NAME).o hal_alsa.o hal_sndfile.o log.o hal_mqueue.o
+$(BINARY_NAME): $(BINARY_NAME).o sample_trig.o hal_alsa.o hal_sndfile.o log.o hal_mqueue.o
 	$(CC) $^ $(LDFLAGS) -o $@
 
 $(BINARY_NAME).o: $(BINARY_NAME).c
