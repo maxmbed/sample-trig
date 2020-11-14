@@ -54,6 +54,8 @@ typedef int sample_id_t;
 typedef struct sample {
     pthread_t       tid;
     sample_id_t     id;
+    mq_t            mq;
+    msg_t           msg;
     audio_file_t    file;
     alsa_pcm_t      alsa;
 
@@ -90,6 +92,11 @@ void sample_clean_thread(sample_t *sample) {
         hal_alsa_pcm_close(sample->alsa.pcm_handle);
     }
 
+    LOG_INFO("Trig %d: de-init mqueue\n", sample->id);
+    if (hal_mqueue_deinit(&sample->mq) < 0) {
+        LOG_ERROR("Sample message deinit failure\n");
+    }
+
     if (sample != NULL) {
         LOG_INFO("Trig %d: freeing sample\n", sample->id);
         free(sample);
@@ -107,7 +114,6 @@ static void* sample_thread(void* arg) {
     int frame_count = 0;
     int thread_disable = 0;
     int last_frame_flag = 0;
-    msg_t msg_sample;
 
     sample_t* sample = (sample_t*) arg;
 
@@ -126,15 +132,15 @@ static void* sample_thread(void* arg) {
 
     while(thread_disable == 0) {
 
-        ret_msg = hal_mqueue_pull(sample->id, &msg_sample, 60);
+        ret_msg = hal_mqueue_pull(&sample->mq, &sample->msg, 60);
         if (ret_msg > 0) {
 
             LOG_INFO("Trig %d: received audio message\n", sample->id);
-            switch (msg_sample.msg_id) {
+            switch (sample->msg.msg_id) {
 
                 case SAMPLE_START:
 
-                    msg_sample.msg_id = 99;
+                    sample->msg.msg_id = 99;
 
                     LOG_INFO("Trig %d: trigger sample\n", sample->id);
                     LOG_INFO("Trig %d: pcm state: %d-%s\n", sample->id, hal_get_pcm_state_int(sample->alsa.pcm_handle), hal_get_pcm_state_str(sample->alsa.pcm_handle));
@@ -157,10 +163,10 @@ static void* sample_thread(void* arg) {
                         //LOG_DEBUG("Trig %d: %d/%d frame available\n", sample->id, hal_alsa_get_pcm_frame_avail(sample->alsa.pcm_handle), sample->alsa.pcm_info.buffer_size);
                         hal_alsa_pcm_write(sample->alsa.pcm_handle, sample->file.buffer, frame_count);
 
-                        hal_mqueue_pull(sample->id, &msg_sample, 0);
-                        if (msg_sample.msg_id == SAMPLE_START) {
+                        hal_mqueue_pull(&sample->mq, &sample->msg, 0);
+                        if (sample->msg.msg_id == SAMPLE_START) {
 
-                            msg_sample.msg_id = 99;
+                            sample->msg.msg_id = 99;
                             LOG_INFO("Trig %d: re-trigger sample\n", sample->id);
                             LOG_INFO("Trig %d: pcm state: %d-%s\n", sample->id, hal_get_pcm_state_int(sample->alsa.pcm_handle), hal_get_pcm_state_str(sample->alsa.pcm_handle));
 
@@ -184,10 +190,9 @@ static void* sample_thread(void* arg) {
     }
 
     int sample_id = sample->id;
+    hal_mqueue_set_msg_id(&sample->msg, SAMPLE_EXITED);
+    hal_mqueue_push(&sample->mq, &sample->msg);
     sample_clean_thread(sample);
-
-    msg_sample.msg_id = SAMPLE_EXITED;
-    hal_mqueue_push(sample_id, &msg_sample);
 
     LOG_INFO("Trig %d: exiting sample thread\n", sample_id);
     pthread_exit(NULL);
@@ -202,6 +207,7 @@ int main(int argc, char* argv[]) {
     int num_sample_trig = 0;
     sample_t* sample[samples_max] = {0};
 
+
     LOG_INFO("Start %s\n", argv[0]);
 
     if (argv[1] == NULL) {
@@ -215,16 +221,6 @@ int main(int argc, char* argv[]) {
     }
 
     num_sample_trig = argc -1;
-
-    if (hal_mqueue_init(num_sample_trig, SAMPLE_MESSAGE_NAME) < 0) {
-        LOG_ERROR("Sample message init failure\n");
-        return -1;
-    }
-
-    if (hal_mqueue_set_id_string_ptr(sample_msg_id_str, SAMPLE_ID_MAX_MSG)) {
-        LOG_ERROR("Set sample message list failure\n");
-        return -1;
-    }
 
     for (i=0;i< num_sample_trig;i++) {
 
@@ -242,7 +238,16 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
+        char sample_mq_name[CH_NAME_MAX] = {0};
+        sprintf(sample_mq_name, "%s_%d", SAMPLE_MESSAGE_NAME, i);
+        if (hal_mqueue_init(&sample[i]->mq, sample_mq_name, NULL) < 0) {
+            LOG_ERROR("Sample message init failure\n");
+            return -1;
+        }
+
         sample[i]->id = i;
+        sample[i]->msg.msg_id_str = sample_msg_id_str;
+        sample[i]->msg.msg_id_max = SAMPLE_ID_MAX_MSG;
 
         ret = pthread_create(&sample[i]->tid, NULL, sample_thread, (void*)sample[i]);
         if (ret) {
@@ -263,7 +268,6 @@ int main(int argc, char* argv[]) {
     hal_sndfile_set_notification_callback(sample_file_notifier);
 
     int quit = 0;
-    msg_t msg;
     char key_trig[2] = {0};
 
     while (quit == 0) {
@@ -281,8 +285,9 @@ int main(int argc, char* argv[]) {
                 if (sample[sample_0] == NULL)
                     continue;
 
-                msg.msg_id = SAMPLE_START;
-                if (hal_mqueue_push(sample[sample_0]->id, &msg) < 0) {
+                hal_mqueue_set_msg_id(&sample[sample_0]->msg, SAMPLE_START);
+
+                if (hal_mqueue_push(&sample[sample_0]->mq, &sample[sample_0]->msg) < 0) {
                     LOG_ERROR("Sample message push failed\n");
                 }
                 break;
@@ -292,26 +297,25 @@ int main(int argc, char* argv[]) {
                 if (sample[sample_1] == NULL)
                     continue;
 
-                msg.msg_id = SAMPLE_START;
-                if (hal_mqueue_push(sample[sample_1]->id, &msg) < 0) {
+                hal_mqueue_set_msg_id(&sample[sample_1]->msg, SAMPLE_START);
+                if (hal_mqueue_push(&sample[sample_1]->mq, &sample[sample_1]->msg) < 0) {
                     LOG_ERROR("Sample message push failed\n");
                 }
                 break;
 
             case key_exit:
 
-                msg.msg_id = SAMPLE_DEINIT;
-
                 for (i=0;i<num_sample_trig;i++) {
 
-                    if (hal_mqueue_push(sample[i]->id, &msg) < 0) {
+                    hal_mqueue_set_msg_id(&sample[i]->msg, SAMPLE_DEINIT);
+                    if (hal_mqueue_push(&sample[i]->mq, &sample[i]->msg) < 0) {
                         LOG_ERROR("Sample message push failed\n");
                     }
                 }
 
                 for (i=0;i<num_sample_trig;i++) {
 
-                    if (hal_mqueue_pull(sample[i]->id, &msg, 1) < 0) {
+                    if (hal_mqueue_pull(&sample[i]->mq, &sample[i]->msg, 1) < 0) {
                         LOG_ERROR("Sample message pull failed\n");
                     }
                 }
@@ -327,12 +331,7 @@ int main(int argc, char* argv[]) {
         usleep(10000);
     }
 
-    sleep(1); // wait thread to exit (workaround)
-
-    if (hal_mqueue_deinit(SAMPLE_MESSAGE_NAME) < 0) {
-        LOG_ERROR("Sample message deinit failure\n");
-        return -1;
-    }
+    sleep(1); // TODO wait thread to exit (workaround)
 
     LOG_INFO("EOP\n");
     return 0;

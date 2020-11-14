@@ -9,104 +9,70 @@
 #include <time.h>
 #include "log.h"
 
-#define STR_MAX_BUF    16
-
-struct timespec message_timeout; // Message timeout
-
-mqd_t*      mq_handler_g = NULL;
-int         mq_handler_num_g = 0;
-const char* mq_handler_name_g = NULL;
-int         mq_handler_id_max_g = 0;
-
 // message queue attributes
-const struct mq_attr ma = {
+const struct mq_attr mq_attr_default = {
     .mq_flags   =   0,                // blocking read/write
     .mq_maxmsg  =   10,               // maximum number of messages allowed in queue
     .mq_msgsize =   sizeof(msg_t),    // messages size content
     .mq_curmsgs =   0,
 };
 
-const char** message_queue_str = NULL;
 
-int hal_mqueue_set_id_string_ptr(const char** msg_id_string_ptr, int msg_id_max) {
+const char* mqueu_get_id_string(msg_t* msg, int msg_id) {
 
-    if (msg_id_string_ptr == NULL) {
-        LOG_ERROR("Message id string pointer null\n");
-        return -1;
-    }
-
-    message_queue_str = msg_id_string_ptr;
-    mq_handler_id_max_g = msg_id_max;
-
-    return 0;
-}
-
-const char* hal_mqueu_get_id_string(int msg_id) {
-
-    if (message_queue_str == NULL) {
+    if (msg->msg_id_str == NULL) {
         return (const char*)"(msg list string not set)";
     }
 
-    if (msg_id >= mq_handler_id_max_g) {
-        return (const char*)"(msg id string not set)";
+    if (msg_id >= msg->msg_id_max) {
+        return (const char*)"(msg id string unknown)";
     }
 
-    return message_queue_str[msg_id];
+    return msg->msg_id_str[msg_id];
 }
 
-int hal_mqueue_init(short msg_ch_num, const char* msg_queue_name) {
+struct mq_attr mqueue_attribute_get_default(void) {
 
-    short i = 0;
-    char mq_handler_name[STR_MAX_BUF] = {0};
+    return mq_attr_default;
+}
 
-    LOG_INFO("Initialize message queue channel\n");
+int hal_mqueue_init(mq_t* mq, const char* mq_name, struct mq_attr* attribute) {
 
-    mq_handler_g = malloc(msg_ch_num);
-    if (mq_handler_g == NULL) {
-        LOG_ERROR("Message queue allocation failure: %s", strerror(errno));
+    LOG_INFO("Initialize message queue channel %s\n", mq_name);
+
+    if (attribute == NULL) {
+
+        mq->attr = mqueue_attribute_get_default();
+    } else {
+
+        mq->attr = *attribute;
+    }
+
+    mq->handle = mq_open(mq_name, O_RDWR | O_CREAT, 0644, &mq_attr_default);
+    if (mq->handle == -1) {
+        LOG_ERROR("Failed to create message queue: %s\n",strerror(errno));
         return -1;
     }
 
-    for (i=0;i<msg_ch_num;i++) {
-
-        snprintf(mq_handler_name, STR_MAX_BUF, "%s_%d", msg_queue_name, i);
-
-        mq_handler_g[i] = mq_open(mq_handler_name, O_RDWR | O_CREAT, 0644, &ma);
-        if (mq_handler_g[i] == -1) {
-            LOG_ERROR("Failed to create message queue: %s\n",strerror(errno));
-            return -1;
-        }
-    }
-
-    mq_handler_num_g = msg_ch_num;
-    LOG_INFO("%d queue channel(s) initialized\n", mq_handler_num_g);
+    strncpy(mq->name, mq_name, CH_NAME_MAX-1);
 
     return 0;
 }
 
-int hal_mqueue_deinit(const char* msg_queue_name) {
+int hal_mqueue_deinit(mq_t* mq) {
 
-    short i = 0;
-    char mq_handler_name[STR_MAX_BUF] = {0};
 
     LOG_INFO("Deinitialise message queue\n");
 
-    for (i=0;i<mq_handler_num_g;i++) {
-
-        if (mq_close(mq_handler_g[i])) {
-            LOG_ERROR("Failed to close message queue: %s\n",strerror(errno));
-            return -1;
-        }
-
-        snprintf(mq_handler_name, STR_MAX_BUF, "%s_%d", msg_queue_name, i);
-
-        if (mq_unlink(mq_handler_name)) {
-            LOG_ERROR("Failed to unlink message queue: %s\n",strerror(errno));
-            return -1;
-        }
+    if (mq_close(mq->handle)) {
+        LOG_ERROR("Failed to close message queue: %s\n",strerror(errno));
+        return -1;
     }
 
-    free(mq_handler_g);
+    if (mq_unlink(mq->name)) {
+        LOG_ERROR("Failed to unlink message queue: %s\n",strerror(errno));
+        return -1;
+    }
 
     return 0;
 }
@@ -123,58 +89,49 @@ int hal_mqueue_set_timestamp(msg_t* msg) {
     return 0;
 }
 
-int hal_mqueue_push(short msg_ch, msg_t* msg) {
+int hal_mqueue_push(mq_t* mq, msg_t* msg) {
 
     if (msg == NULL) {
         LOG_ERROR("Message push handle null\n");
         return -1;
     }
 
-    if (msg_ch > mq_handler_num_g) {
-        LOG_ERROR("Message channel unknown\n");
-        return -1;
-    }
-
     hal_mqueue_set_timestamp(msg);
 
-    LOG_INFO("Message push ch%d:id%d-%ld:'%s'\n", msg_ch, msg->msg_id, msg->msg_timestamp, hal_mqueu_get_id_string(msg->msg_id));
+    LOG_INFO("Message push ch%d:id%d-%ld:'%s'\n", mq->handle, msg->msg_id, msg->msg_timestamp, mqueu_get_id_string(msg, msg->msg_id));
 
-    if (mq_send(mq_handler_g[msg_ch], (char*)msg, sizeof(msg_t), 0) == -1) {
-        LOG_ERROR("Failed to push message ch%d:id%d-%ld:'%s': %s\n", msg_ch, msg->msg_id, msg->msg_timestamp, hal_mqueu_get_id_string(msg->msg_id), strerror(errno));
+    if (mq_send(mq->handle, (char*)msg, sizeof(msg_t), 0) == -1) {
+        LOG_ERROR("Failed to push message ch%d:id%d-%ld:'%s': %s\n", mq->handle, msg->msg_id, msg->msg_timestamp, mqueu_get_id_string(msg, msg->msg_id), strerror(errno));
         return -1;
     }
 
     return 0;
 }
 
-int hal_mqueue_pull(short msg_ch, msg_t* msg, int msg_timeout) {
+int hal_mqueue_pull(mq_t* mq, msg_t* msg, int msg_timeout) {
 
     if (msg == NULL) {
         LOG_ERROR("message pull handle null\n");
         return -1;
     }
 
-    if (msg_ch > mq_handler_num_g) {
-        LOG_ERROR("Message channel unknown\n");
-        return -1;
-    }
-
     int msg_ret = 0;
+    struct timespec message_timeout;
 
     clock_gettime(CLOCK_REALTIME, &message_timeout);
     message_timeout.tv_sec += msg_timeout;
 
-    msg_ret = mq_timedreceive(mq_handler_g[msg_ch],(char*)msg, sizeof(msg_t)+1, 0, &message_timeout);
+    msg_ret = mq_timedreceive(mq->handle,(char*)msg, sizeof(msg_t)+1, 0, &message_timeout);
     if (msg_ret < 0) {
 
         if (errno != ETIMEDOUT && msg_timeout != 0) {
-            LOG_ERROR("Failed to wait message ch%d:id%d-%ld:'%s': %s\n", msg_ch, msg->msg_id, msg->msg_timestamp, hal_mqueu_get_id_string(msg->msg_id), strerror(errno));
+            LOG_ERROR("Failed to wait message ch%d:id%d-%ld:'%s': %s\n", mq->handle, msg->msg_id, msg->msg_timestamp, mqueu_get_id_string(msg, msg->msg_id), strerror(errno));
             msg_ret = -1;
         }
 
     } else if (msg_ret >= 0) {
 
-        LOG_INFO("Message pull ch%d:id%d-%ld:'%s'\n", msg_ch, msg->msg_id, msg->msg_timestamp, hal_mqueu_get_id_string(msg->msg_id));
+        LOG_INFO("Message pull ch%d:id%d-%ld:'%s'\n", mq->handle, msg->msg_id, msg->msg_timestamp, mqueu_get_id_string(msg, msg->msg_id));
     }
 
     if (msg_ret == -1) {
@@ -182,4 +139,9 @@ int hal_mqueue_pull(short msg_ch, msg_t* msg, int msg_timeout) {
     }
 
     return msg_ret;
+}
+
+void hal_mqueue_set_msg_id(msg_t* msg, int msg_id) {
+
+    msg->msg_id = msg_id;
 }

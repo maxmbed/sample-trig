@@ -4,19 +4,35 @@
 #include <mqueue.h>
 #include <time.h>
 
-// Message structure
+#define CH_NAME_MAX 16
+
+// Message queue channel structure
+typedef struct mq {
+
+    mqd_t          handle;
+    char           name[CH_NAME_MAX];
+    struct mq_attr attr;
+
+} mq_t;
+
+// Message queue message structure
 typedef struct msg {
-    int     msg_id;
-    void*   msg_ptr;
-    int     msg_int;
-    clock_t msg_timestamp;
+
+    int             msg_id;
+    const char**    msg_id_str;
+    int             msg_id_max;
+
+    void*           msg_val_ptr;
+    int             msg_val_int;
+    clock_t         msg_timestamp;
 
 } msg_t;
 
-int hal_mqueue_init(short msg_ch_num, const char* msg_queue_name);
-int hal_mqueue_deinit(const char* msg_queue_name);
-int hal_mqueue_set_id_string_ptr(const char** msg_id_string_ptr, int msg_id_max);
-int hal_mqueue_push(short msg_ch, msg_t* msg);
-int hal_mqueue_pull(short msg_ch, msg_t* msg, int msg_timeout);
+
+int hal_mqueue_init(mq_t* mq, const char* mq_name, struct mq_attr* attribute);
+int hal_mqueue_deinit(mq_t* mq);
+int hal_mqueue_push(mq_t* mq, msg_t* msg);
+int hal_mqueue_pull(mq_t* mq, msg_t* msg, int msg_timeout);
+void hal_mqueue_set_msg_id(msg_t* msg, int msg_id);
 
 #endif /* HAL_MESSAGE_QUEUE_H_ */
