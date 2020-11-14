@@ -3,6 +3,11 @@
 
 #include <sndfile.h>
 
+typedef enum audio_file_event {
+    last_frame_event=1,
+
+} audio_file_event_t;
+
 typedef struct audio_file {
 
     SF_INFO     info;

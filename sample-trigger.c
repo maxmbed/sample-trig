@@ -64,9 +64,18 @@ typedef struct sample {
 
 const char buffer_null[1024] = {0};
 
-void sample_file_notifier(long int frame) {
+void sample_file_notifier(audio_file_event_t event) {
 
-    LOG_INFO("Last frame size of %ld reached\n", frame);
+    switch (event) {
+
+    case last_frame_event:
+        LOG_INFO("Last frame reached\n");
+        break;
+
+    default:
+        LOG_INFO("audio file event uknown\n");
+        break;
+    }
 }
 
 void sample_free_resources(sample_t** sample_ptr, int num_resource) {

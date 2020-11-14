@@ -5,7 +5,7 @@
 #include "log.h"
 #include "hal_sndfile.h"
 
-typedef void (*sndfile_noficiation_callback_t)(long int state);
+typedef void (*sndfile_noficiation_callback_t)(audio_file_event_t event);
 
 sndfile_noficiation_callback_t sndfile_notification_cb = NULL;
 
@@ -83,7 +83,7 @@ long int hal_sndfile_read(audio_file_t* audio_file, sf_count_t num_frames) {
 
         if (sndfile_notification_cb != NULL) {
 
-            sndfile_notification_cb(frame_count);
+            sndfile_notification_cb(last_frame_event);
         }
     }
     return frame_count;
