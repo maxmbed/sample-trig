@@ -12,6 +12,7 @@
 #include "hal_sndfile.h"
 
 #define SAMPLE_MESSAGE_NAME "/trigger"
+#define SAMPLE_PCM_NAME     "default"
 
 enum samples_id {
     sample_0,
@@ -130,7 +131,7 @@ static void* sample_thread(void* arg) {
 
     sample->alsa.pcm_info.channel = sample->file.info.channels;
 
-    sample->alsa.pcm_handle = hal_alsa_pcm_open("default", &sample->alsa.pcm_info);
+    sample->alsa.pcm_handle = hal_alsa_pcm_open(SAMPLE_PCM_NAME, &sample->alsa.pcm_info);
     if (sample->alsa.pcm_handle == NULL) {
 
         LOG_ERROR("Trig %d: Open pcm device failed\n", sample->id);
