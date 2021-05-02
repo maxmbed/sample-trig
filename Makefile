@@ -7,7 +7,7 @@ all: $(BINARY_NAME)
 # $^ all dependencies
 # $? all dependencies more recent than the target
 
-CFLAGS  += -O0 -Dposix -ggdb -O2 -msoft-float -Wall -Wlogical-op -Wtype-limits -Wsign-compare -Wshadow -Wpointer-arith -Wstrict-prototypes -I . -I $(SDKTARGETSYSROOT)/usr/include
+CFLAGS  += -O0 -Dposix -ggdb -msoft-float -Wall -Wlogical-op -Wtype-limits -Wsign-compare -Wshadow -Wpointer-arith -Wstrict-prototypes -I . -I $(SDKTARGETSYSROOT)/usr/include
 LDFLAGS += -lsndfile -lasound -lpthread -lrt -ldl -lm
 LDFLAGS += -L $(SDKTARGETSYSROOT)/usr/lib -L $(SDKTARGETSYSROOT)/lib
 
