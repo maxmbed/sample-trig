@@ -3,6 +3,8 @@
 #include "log.h"
 
 #define SAMPLE_RATE 44100
+#define MIN_PERIOD  8192
+#define BUFFER_MULT_HEADROOM 2
 
 void alsa_pcm_print_info(pcm_info_t* pcm_info) {
 
@@ -130,8 +132,16 @@ int alsa_pcm_set_parameters(snd_pcm_t* handle, pcm_info_t* pcm_info) {
         return -1;
     }
 
-    snd_pcm_uframes_t buffer_size = 1024 * pcm_info->channel * sizeof(short);
-    ret = snd_pcm_hw_params_set_buffer_size(handle, pcm_info->handler, buffer_size);
+    snd_pcm_uframes_t buffer_size = MIN_PERIOD * pcm_info->channel;
+    ret = snd_pcm_hw_params_set_buffer_size_near(handle, pcm_info->handler, &buffer_size);
+    if (ret < 0) {
+
+        LOG_ERROR("set buffer size: %s\n", snd_strerror(ret));
+        return -1;
+    }
+
+    snd_pcm_uframes_t period_size = MIN_PERIOD * pcm_info->channel;
+    ret = snd_pcm_hw_params_set_period_size_near(handle, pcm_info->handler, &period_size, 0);
     if (ret < 0) {
 
         LOG_ERROR("set buffer size: %s\n", snd_strerror(ret));
