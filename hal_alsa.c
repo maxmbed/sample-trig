@@ -110,7 +110,7 @@ int alsa_pcm_set_parameters(snd_pcm_t* handle, pcm_info_t* pcm_info) {
         return -1;
     }
 
-    ret = snd_pcm_hw_params_set_format(handle, pcm_info->handler, SND_PCM_FORMAT_S16_LE);
+    ret = snd_pcm_hw_params_set_format(handle, pcm_info->handler, SND_PCM_FORMAT_FLOAT);
     if (ret < 0) {
 
         LOG_ERROR("set format: %s\n", snd_strerror(ret));

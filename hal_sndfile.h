@@ -13,7 +13,8 @@ typedef struct audio_file {
     SF_INFO     info;
     SNDFILE*    handler;
     char*       path;
-    short*      buffer;
+    float*      buffer;
+    int         last_frame_flag;
 
 } audio_file_t;
 

@@ -1,12 +1,15 @@
 #include <pthread.h>
 #include <fcntl.h>
+#include <samplerate.h>
 #include "hal_alsa.h"
 #include "hal_mqueue.h"
 #include "hal_sndfile.h"
 
+
 typedef enum sample_cmd_id {
     SAMPLE_START=0,
     SAMPLE_DEINIT,
+    SAMPLE_RATIO,
     SAMPLE_EXITED,
 
     SAMPLE_ID_MAX_MSG,
@@ -25,6 +28,13 @@ typedef enum samples_trig_id {
 
 } sample_id_t;
 
+typedef struct samplerate {
+
+    SRC_STATE       *handle_state;
+    float           buf_in[8192];
+    float           buf_out[8192];
+} samplerate_t;
+
 typedef struct sample_trig {
     pthread_t       tid;
     sample_id_t     id;
@@ -32,6 +42,7 @@ typedef struct sample_trig {
     msg_t           msg;
     audio_file_t    file;
     alsa_pcm_t      alsa;
+    samplerate_t    src;
 
 } sample_trig_t;
 

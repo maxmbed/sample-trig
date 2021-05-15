@@ -7,8 +7,8 @@ all: $(BINARY_NAME)
 # $^ all dependencies
 # $? all dependencies more recent than the target
 
-CFLAGS  += -O0 -Dposix -ggdb -msoft-float -Wall -Wlogical-op -Wtype-limits -Wsign-compare -Wshadow -Wpointer-arith -Wstrict-prototypes -I . -I $(SDKTARGETSYSROOT)/usr/include
-LDFLAGS += -lsndfile -lasound -lpthread -lrt -ldl -lm
+CFLAGS  += -Og -Dposix -ggdb -msoft-float -Wall -Wlogical-op -Wtype-limits -Wsign-compare -Wshadow -Wpointer-arith -Wstrict-prototypes -I . -I $(SDKTARGETSYSROOT)/usr/include
+LDFLAGS += -lsndfile -lasound -lpthread -lrt -ldl -lm -lsamplerate
 LDFLAGS += -L $(SDKTARGETSYSROOT)/usr/lib -L $(SDKTARGETSYSROOT)/lib
 
 $(BINARY_NAME): $(BINARY_NAME).o sample_trig.o hal_alsa.o hal_sndfile.o log.o hal_mqueue.o

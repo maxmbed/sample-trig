@@ -78,7 +78,7 @@ long int hal_sndfile_read(audio_file_t* audio_file, sf_count_t num_frames) {
 
     sf_count_t frame_count;
 
-    frame_count = sf_readf_short(audio_file->handler, audio_file->buffer, num_frames);
+    frame_count = sf_readf_float(audio_file->handler, audio_file->buffer, num_frames);
     if (frame_count < num_frames) {
 
         if (sndfile_notification_cb != NULL) {
