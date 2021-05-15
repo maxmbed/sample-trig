@@ -62,7 +62,7 @@ int hal_mqueue_init(mq_t* mq, const char* mq_name, struct mq_attr* attribute) {
 int hal_mqueue_deinit(mq_t* mq) {
 
 
-    LOG_INFO("Deinitialise message queue\n");
+    LOG_INFO("Deinitialise message queue %s\n", mq->name);
 
     if (mq_close(mq->handle)) {
         LOG_ERROR("Failed to close message queue: %s\n",strerror(errno));
