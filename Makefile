@@ -12,7 +12,7 @@ LDFLAGS += -lsndfile -lasound -lpthread -lrt -ldl -lm
 LDFLAGS += -L $(SDKTARGETSYSROOT)/usr/lib -L $(SDKTARGETSYSROOT)/lib
 
 $(BINARY_NAME): $(BINARY_NAME).o sample_trig.o hal_alsa.o hal_sndfile.o log.o hal_mqueue.o
-	$(CC) $^ $(LDFLAGS) -o $@
+	$(CC) $^ $(LDFLAGS) --sysroot=$(SDKTARGETSYSROOT) -o $@
 
 $(BINARY_NAME).o: $(BINARY_NAME).c
 	$(CC) $(CFLAGS) -c $<
